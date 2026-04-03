@@ -1,0 +1,456 @@
+import SwiftUI
+
+struct CalculatorsView: View {
+    @StateObject private var calcVM = CalculatorViewModel()
+    @State private var selectedCalc: CalcType? = nil
+
+    enum CalcType: String, CaseIterable {
+        case brick = "Brick"
+        case concrete = "Concrete"
+        case tile = "Tile"
+        case paint = "Paint"
+        case drywall = "Drywall"
+        case insulation = "Insulation"
+
+        var icon: String {
+            switch self {
+            case .brick: return "square.3.layers.3d.down.right"
+            case .concrete: return "cube.fill"
+            case .tile: return "square.grid.2x2.fill"
+            case .paint: return "paintbrush.fill"
+            case .drywall: return "rectangle.split.2x1.fill"
+            case .insulation: return "thermometer.snowflake"
+            }
+        }
+        var color: Color {
+            switch self {
+            case .brick: return Color(hex: "#E74C3C")
+            case .concrete: return Color(hex: "#95A5A6")
+            case .tile: return Color(hex: "#3498DB")
+            case .paint: return Color(hex: "#9B59B6")
+            case .drywall: return Color(hex: "#F39C12")
+            case .insulation: return Color(hex: "#1ABC9C")
+            }
+        }
+        var description: String {
+            switch self {
+            case .brick: return "Calculate bricks for walls"
+            case .concrete: return "Volume and mix ratios"
+            case .tile: return "Floor & wall coverage"
+            case .paint: return "Coverage by area & coats"
+            case .drywall: return "Panel count for walls"
+            case .insulation: return "Coverage & R-value"
+            }
+        }
+    }
+
+    let columns = [GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.surfaceLight.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Banner
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Material Calculators")
+                                    .font(SBCFont.headline(18))
+                                    .foregroundColor(.white)
+                                Text("Precise estimates with wastage")
+                                    .font(SBCFont.body(13))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                            Spacer()
+                            Image(systemName: "function")
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(.white.opacity(0.3))
+                        }
+                        .padding(20)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(LinearGradient.slateGradient))
+
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(CalcType.allCases, id: \.self) { type in
+                                CalcCard(type: type)
+                                    .onTapGesture { selectedCalc = type }
+                            }
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle("Calculators")
+            .sheet(item: $selectedCalc) { type in
+                CalculatorDetailView(calcType: type, calcVM: calcVM)
+            }
+        }
+    }
+}
+
+extension CalculatorsView.CalcType: Identifiable {
+    var id: String { rawValue }
+}
+
+struct CalcCard: View {
+    var type: CalculatorsView.CalcType
+    @State private var pressed = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(type.color.opacity(0.15))
+                    .frame(width: 48, height: 48)
+                Image(systemName: type.icon)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(type.color)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(type.rawValue)
+                    .font(SBCFont.headline(16))
+                Text(type.description)
+                    .font(SBCFont.body(12))
+                    .foregroundColor(.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            HStack {
+                Spacer()
+                Image(systemName: "arrow.right.circle.fill")
+                    .foregroundColor(type.color)
+                    .font(.system(size: 20))
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 160, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(UIColor.systemBackground))
+                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 4)
+        )
+        .scaleEffect(pressed ? 0.96 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: pressed)
+    }
+}
+
+// MARK: - Calculator Detail
+struct CalculatorDetailView: View {
+    var calcType: CalculatorsView.CalcType
+    @ObservedObject var calcVM: CalculatorViewModel
+    @EnvironmentObject var settingsVM: SettingsViewModel
+    @EnvironmentObject var projectsVM: ProjectsViewModel
+    @Environment(\.presentationMode) var presentationMode
+    @State private var showSaveSheet = false
+    @State private var savedToShopping = false
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.surfaceLight.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Input fields
+                        VStack(spacing: 14) {
+                            switch calcType {
+                            case .brick: BrickInputs(calcVM: calcVM)
+                            case .concrete: ConcreteInputs(calcVM: calcVM)
+                            case .tile: TileInputs(calcVM: calcVM)
+                            case .paint: PaintInputs(calcVM: calcVM)
+                            case .drywall: DrywallInputs(calcVM: calcVM)
+                            case .insulation: InsulationInputs(calcVM: calcVM)
+                            }
+                        }
+                        .padding()
+                        .cardStyle(padding: 0)
+
+                        // Calculate button
+                        Button("Calculate") {
+                            calculateForType()
+                        }
+                        .buttonStyle(PrimaryButtonStyle())
+
+                        // Result
+                        if let result = resultForType() {
+                            ResultCard(result: result, currencySymbol: settingsVM.currencySymbol)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+
+                            if savedToShopping {
+                                Label("Added to Shopping List", systemImage: "checkmark.circle.fill")
+                                    .font(SBCFont.caption(14))
+                                    .foregroundColor(.brandGreen)
+                            }
+
+                            Button("Add to Shopping List") {
+                                if let result = resultForType() {
+                                    let item = ShoppingItem(
+                                        materialName: result.materialName,
+                                        quantity: result.amount,
+                                        unit: result.unit,
+                                        estimatedCost: result.estimatedCost
+                                    )
+                                    projectsVM.addShoppingItem(item)
+                                    withAnimation { savedToShopping = true }
+                                }
+                            }
+                            .buttonStyle(SecondaryButtonStyle())
+                        }
+                    }
+                    .padding(16)
+                }
+            }
+            .navigationTitle(calcType.rawValue + " Calculator")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { presentationMode.wrappedValue.dismiss() }
+                        .foregroundColor(.brandOrange)
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: resultForType() != nil)
+        }
+    }
+
+    func calculateForType() {
+        savedToShopping = false
+        switch calcType {
+        case .brick:
+            calcVM.calculateBricks(pricePerBrick: settingsVM.defaultPricePerBrick, wastage: settingsVM.wastagePercentage)
+        case .concrete:
+            calcVM.calculateConcrete(pricePerM3: settingsVM.defaultPricePerM3Concrete, wastage: settingsVM.wastagePercentage)
+        case .tile:
+            calcVM.calculateTiles(pricePerM2: settingsVM.defaultPricePerM2Tile, wastage: settingsVM.wastagePercentage)
+        case .paint:
+            calcVM.calculatePaint(pricePerL: settingsVM.defaultPricePaintPerL, wastage: settingsVM.wastagePercentage)
+        case .drywall:
+            calcVM.calculateDrywall(pricePerSheet: settingsVM.defaultPriceDrywallPerSheet, wastage: settingsVM.wastagePercentage)
+        case .insulation:
+            calcVM.calculateInsulation(pricePerM2: settingsVM.defaultPriceInsulationPerM2, wastage: settingsVM.wastagePercentage)
+        }
+    }
+
+    func resultForType() -> CalculatorResult? {
+        switch calcType {
+        case .brick: return calcVM.brickResult
+        case .concrete: return calcVM.concreteResult
+        case .tile: return calcVM.tileResult
+        case .paint: return calcVM.paintResult
+        case .drywall: return calcVM.drywallResult
+        case .insulation: return calcVM.insulationResult
+        }
+    }
+}
+
+// MARK: - Calculator Result Card
+struct ResultCard: View {
+    var result: CalculatorResult
+    var currencySymbol: String
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("Calculation Result")
+                    .font(SBCFont.headline(16))
+                Spacer()
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.brandGreen)
+                    .font(.system(size: 20))
+            }
+
+            HStack(alignment: .bottom) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(String(format: "%.2f", result.amount))
+                        .font(SBCFont.display(36))
+                        .foregroundColor(.brandOrange)
+                    Text(result.unit)
+                        .font(SBCFont.body(14))
+                        .foregroundColor(.textSecondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Est. Cost")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                    Text("\(currencySymbol)\(String(format: "%.2f", result.estimatedCost))")
+                        .font(SBCFont.display(22))
+                        .foregroundColor(.brandGold)
+                }
+            }
+
+            Divider()
+
+            VStack(spacing: 8) {
+                ForEach(result.breakdown, id: \.label) { item in
+                    HStack {
+                        Text(item.label)
+                            .font(SBCFont.body(13))
+                            .foregroundColor(.textSecondary)
+                        Spacer()
+                        Text(item.value)
+                            .font(SBCFont.caption(13))
+                    }
+                }
+            }
+        }
+        .cardStyle()
+    }
+}
+
+// MARK: - Input Forms
+struct BrickInputs: View {
+    @ObservedObject var calcVM: CalculatorViewModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                SBCInputField(title: "Wall Height (m)", placeholder: "3.0", text: $calcVM.brickWallHeight, keyboardType: .decimalPad)
+                SBCInputField(title: "Wall Width (m)", placeholder: "5.0", text: $calcVM.brickWallWidth, keyboardType: .decimalPad)
+            }
+            SBCInputField(title: "Wall Thickness (m)", placeholder: "0.25", text: $calcVM.brickWallThickness, keyboardType: .decimalPad)
+            SBCInputField(title: "Mortar Thickness (mm)", placeholder: "10", text: $calcVM.brickMortarThickness, keyboardType: .decimalPad)
+
+            VStack(alignment: .leading, spacing: 6) {
+                if #available(iOS 16.0, *) {
+                    Text("Brick Size")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                } else {
+                    Text("Brick Size")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                }
+                Picker("Brick Size", selection: $calcVM.brickSizeType) {
+                    ForEach(CalculatorViewModel.BrickSize.allCases, id: \.self) { size in
+                        Text(size.rawValue).tag(size)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+}
+
+struct ConcreteInputs: View {
+    @ObservedObject var calcVM: CalculatorViewModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 12) {
+                SBCInputField(title: "Length (m)", placeholder: "5.0", text: $calcVM.concreteLength, keyboardType: .decimalPad)
+                SBCInputField(title: "Width (m)", placeholder: "4.0", text: $calcVM.concreteWidth, keyboardType: .decimalPad)
+            }
+            SBCInputField(title: "Depth / Height (m)", placeholder: "0.15", text: $calcVM.concreteHeight, keyboardType: .decimalPad)
+            VStack(alignment: .leading, spacing: 6) {
+                if #available(iOS 16.0, *) {
+                    Text("Concrete Grade")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                } else {
+                    Text("Concrete Grade")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                }
+                Picker("Grade", selection: $calcVM.concreteGrade) {
+                    ForEach(CalculatorViewModel.ConcreteGrade.allCases, id: \.self) { grade in
+                        Text(grade.rawValue).tag(grade)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(height: 100)
+            }
+        }
+    }
+}
+
+struct TileInputs: View {
+    @ObservedObject var calcVM: CalculatorViewModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SBCInputField(title: "Floor/Wall Area (m²)", placeholder: "25.0", text: $calcVM.tileFloorArea, keyboardType: .decimalPad)
+            HStack(spacing: 12) {
+                SBCInputField(title: "Tile Width (cm)", placeholder: "60", text: $calcVM.tileSizeWidth, keyboardType: .decimalPad)
+                SBCInputField(title: "Tile Length (cm)", placeholder: "60", text: $calcVM.tileSizeLength, keyboardType: .decimalPad)
+            }
+            SBCInputField(title: "Grout Width (mm)", placeholder: "3", text: $calcVM.tileGroutWidth, keyboardType: .decimalPad)
+        }
+    }
+}
+
+struct PaintInputs: View {
+    @ObservedObject var calcVM: CalculatorViewModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SBCInputField(title: "Wall Area (m²)", placeholder: "50.0", text: $calcVM.paintWallArea, keyboardType: .decimalPad)
+            SBCInputField(title: "Coverage per Litre (m²)", placeholder: "10", text: $calcVM.paintCoveragePerL, keyboardType: .decimalPad)
+            VStack(alignment: .leading, spacing: 6) {
+                if #available(iOS 16.0, *) {
+                    Text("Number of Coats")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                } else {
+                    Text("Number of Coats")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                }
+                Stepper("\(calcVM.paintCoats) coat\(calcVM.paintCoats > 1 ? "s" : "")", value: $calcVM.paintCoats, in: 1...4)
+                    .font(SBCFont.body(15))
+            }
+        }
+    }
+}
+
+struct DrywallInputs: View {
+    @ObservedObject var calcVM: CalculatorViewModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SBCInputField(title: "Total Wall Area (m²)", placeholder: "60.0", text: $calcVM.drywallWallArea, keyboardType: .decimalPad)
+            HStack(spacing: 12) {
+                SBCInputField(title: "Panel Width (m)", placeholder: "1.2", text: $calcVM.drywallPanelWidth, keyboardType: .decimalPad)
+                SBCInputField(title: "Panel Height (m)", placeholder: "2.4", text: $calcVM.drywallPanelHeight, keyboardType: .decimalPad)
+            }
+        }
+    }
+}
+
+struct InsulationInputs: View {
+    @ObservedObject var calcVM: CalculatorViewModel
+
+    var body: some View {
+        VStack(spacing: 14) {
+            SBCInputField(title: "Surface Area (m²)", placeholder: "80.0", text: $calcVM.insulationSurfaceArea, keyboardType: .decimalPad)
+            SBCInputField(title: "Thickness (cm)", placeholder: "10", text: $calcVM.insulationThickness, keyboardType: .decimalPad)
+            VStack(alignment: .leading, spacing: 6) {
+                if #available(iOS 16.0, *) {
+                    Text("Insulation Type")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                        .tracking(0.5)
+                } else {
+                    Text("Insulation Type")
+                        .font(SBCFont.caption(12))
+                        .foregroundColor(.textSecondary)
+                        .textCase(.uppercase)
+                }
+                Picker("Type", selection: $calcVM.insulationType) {
+                    ForEach(CalculatorViewModel.InsulationType.allCases, id: \.self) { type in
+                        Text(type.rawValue).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+}
