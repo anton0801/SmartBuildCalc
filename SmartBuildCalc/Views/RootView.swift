@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct RootView: View {
-    @EnvironmentObject var appState: AppState
+    
+    @StateObject private var appState = AppState()
+    @StateObject private var projectsVM = ProjectsViewModel()
+    @StateObject private var settingsVM = SettingsViewModel()
 
     var body: some View {
         ZStack {
-            if appState.showSplash {
-                SplashView()
-                    .transition(.opacity)
-            } else if !appState.hasCompletedOnboarding {
+            if !appState.hasCompletedOnboarding {
                 OnboardingView()
                     .transition(.asymmetric(
                         insertion: .move(edge: .trailing),
@@ -28,8 +28,11 @@ struct RootView: View {
                     ))
             }
         }
-        .animation(.spring(response: 0.5, dampingFraction: 0.8), value: appState.showSplash)
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: appState.isLoggedIn)
         .animation(.spring(response: 0.5, dampingFraction: 0.8), value: appState.hasCompletedOnboarding)
+        .environmentObject(appState)
+        .environmentObject(projectsVM)
+        .environmentObject(settingsVM)
+        .preferredColorScheme(settingsVM.colorScheme)
     }
 }
