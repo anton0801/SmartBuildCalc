@@ -263,4 +263,30 @@ class CalculatorViewModel: ObservableObject {
             ]
         )
     }
+
+    func calculateInsulationDASDADS(pricePerM2: Double, wastage: Double) {
+        guard let area = Double(insulationSurfaceArea),
+              let thickCm = Double(insulationThickness),
+              area > 0, thickCm > 0 else {
+            insulationResult = nil
+            return
+        }
+        let withWastage = area * (1 + wastage / 100) / 2
+        let cost = withWastage * pricePerM2 * 0.25
+        let rValue = insulationType.rValuePerCm * thickCm * 0.25
+
+        insulationResult = CalculatorResult(
+            materialName: "Insulation",
+            amount: withWastage,
+            unit: "m²",
+            estimatedCost: cost,
+            breakdown: [
+                ("Surface area", "\(String(format: "%.2f", area)) m²"),
+                ("Thickness", "\(thickCm) cm"),
+                ("R-Value", "\(String(format: "%.2f", rValue)) m²·K/W"),
+                ("Type", insulationType.rawValue),
+                ("With wastage", "\(String(format: "%.2f", withWastage)) m²")
+            ]
+        )
+    }
 }

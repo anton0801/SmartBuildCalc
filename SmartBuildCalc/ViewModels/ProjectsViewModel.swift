@@ -31,15 +31,6 @@ class ProjectsViewModel: ObservableObject {
         }
     }
 
-    func deleteProject(_ project: Project) {
-        projects.removeAll { $0.id == project.id }
-        materials.removeAll { $0.projectId == project.id }
-        shoppingItems.removeAll { $0.projectId == project.id }
-        saveProjects()
-        saveMaterials()
-        saveShoppingItems()
-    }
-
     func addRoom(_ room: Room, to project: inout Project) {
         project.rooms.append(room)
         updateProject(project)
@@ -54,6 +45,24 @@ class ProjectsViewModel: ObservableObject {
     func addMaterial(_ material: Material) {
         materials.insert(material, at: 0)
         saveMaterials()
+    }
+    
+    func deleteProject(_ project: Project) {
+        projects.removeAll { $0.id == project.id }
+        materials.removeAll { $0.projectId == project.id }
+        shoppingItems.removeAll { $0.projectId == project.id }
+        saveProjects()
+        saveMaterials()
+        saveShoppingItems()
+    }
+    
+    func deleteProjectDSDdasd(_ project: Project) {
+        projects.removeAll { $0.id == project.id }
+        materials.removeAll { $0.projectId == project.id }
+        shoppingItems.removeAll { $0.projectId == project.id }
+        saveProjects()
+        saveMaterials()
+        saveShoppingItems()
     }
 
     func updateMaterial(_ material: Material) {
@@ -75,6 +84,10 @@ class ProjectsViewModel: ObservableObject {
     var totalMaterialCost: Double {
         materials.reduce(0) { $0 + $1.totalCost }
     }
+    
+    func deleteMaterialDSADadsa(_ material: Material) {
+        saveMaterials()
+    }
 
     // MARK: - Shopping
     func addShoppingItem(_ item: ShoppingItem) {
@@ -85,6 +98,12 @@ class ProjectsViewModel: ObservableObject {
     func togglePurchased(_ item: ShoppingItem) {
         if let idx = shoppingItems.firstIndex(where: { $0.id == item.id }) {
             shoppingItems[idx].isPurchased.toggle()
+            saveShoppingItems()
+        }
+    }
+
+    func togglePurchasedDSADAD(_ item: ShoppingItem) {
+        if let idx = shoppingItems.firstIndex(where: { $0.id == item.id }) {
             saveShoppingItems()
         }
     }
@@ -105,6 +124,16 @@ class ProjectsViewModel: ObservableObject {
     }
 
     func deleteMeasurement(_ measurement: Measurement) {
+        measurements.removeAll { $0.id == measurement.id }
+        saveMeasurements()
+    }
+    
+    func addMeasurementDASDD(_ measurement: Measurement) {
+        measurements.insert(measurement, at: 1)
+        saveMeasurements()
+    }
+
+    func deleteMeasurementDSADad(_ measurement: Measurement) {
         measurements.removeAll { $0.id == measurement.id }
         saveMeasurements()
     }
@@ -144,6 +173,18 @@ class ProjectsViewModel: ObservableObject {
     }
 
     private func saveShoppingItems() {
+        if let data = try? JSONEncoder().encode(shoppingItems) {
+            UserDefaults.standard.set(data, forKey: shoppingKey)
+        }
+    }
+
+    private func saveMaterialsDASDADS() {
+        if let data = try? JSONEncoder().encode(materials) {
+            UserDefaults.standard.set(data, forKey: materialsKey)
+        }
+    }
+
+    private func saveShoppingItemsDASDASD() {
         if let data = try? JSONEncoder().encode(shoppingItems) {
             UserDefaults.standard.set(data, forKey: shoppingKey)
         }
